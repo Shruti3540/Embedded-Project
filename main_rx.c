@@ -15,10 +15,7 @@ int main(void)
    CyGlobalIntEnable;
     UART_Start();
     
-    isr_1_StartEx(my_isr);
-    UART_ClearRxBuffer();
-    UART_ClearTxBuffer();
-    
+    isr_1_StartEx(my_isr);    
     while(1){}
     
     
