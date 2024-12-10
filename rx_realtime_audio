@@ -1,0 +1,63 @@
+import serial
+import pyaudio
+import time
+
+def receive_and_play_uart(port, baudrate, chunk_size=5500, timeout=5):
+    """
+    Receives PCM data over UART in chunks and plays it in real-time using PyAudio.
+    """
+    try:
+        # Initialize UART
+        ser = serial.Serial(port, baudrate, timeout=1)
+
+        # Initialize PyAudio
+        pyaudio_instance = pyaudio.PyAudio()
+        stream = pyaudio_instance.open(
+            format=pyaudio.paInt16,  # PCM 16-bit audio
+            channels=1,             # Mono audio (adjust if using stereo)
+            rate=1920,             # Sampling rate must match the transmitter
+            output=True              # Playback mode
+        )
+
+        print(f"Connected to {port} at {baudrate} baud.")
+        print("Waiting for data... (Press Ctrl+C to stop)")
+
+        last_received_time = time.time()  # Track the last time data was received
+
+        while True:
+            # Read a chunk of data from UART
+            data = ser.read(chunk_size)
+
+            if data:
+                print(f"Received {len(data)} bytes of audio data.")
+                last_received_time = time.time()  # Update last received time
+
+                # Play the received audio data
+                try:
+                    stream.write(data)  # Play the audio data
+                    print("Audio playback successful.")
+                except Exception as e:
+                    print(f"Error during audio playback: {e}")
+            else:
+                print("No data received, waiting...")
+                if time.time() - last_received_time > timeout:
+                    print(f"No data received for {timeout} seconds. Exiting...")
+                    break  # Exit the loop after timeout period
+
+    except KeyboardInterrupt:
+        print("Stopped by user.")
+    except Exception as e:
+        print(f"Error: {e}")
+    finally:
+        # Cleanup
+        print("Closing resources...")
+        stream.stop_stream()
+        stream.close()
+        pyaudio_instance.terminate()
+        ser.close()
+
+if __name__ == "__main__":
+    port = "COM8"       # UART port
+    baudrate = 38400   # Match the transmitter's baud rate
+    chunk_size = 5500  # Same chunk size as the transmitter
+    receive_and_play_uart(port, baudrate, chunk_size)

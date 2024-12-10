@@ -1,0 +1,56 @@
+import serial
+import time
+import subprocess
+
+def mp3_to_pcm_bytes(mp3_file_path):
+    """
+    Converts an MP3 file to PCM byte data using FFmpeg.
+    """
+    process = subprocess.Popen(
+        ['ffmpeg', '-i', mp3_file_path, '-f', 's16le', '-ar', '1920', '-ac', '1', '-'],
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE
+    )
+    
+    raw_pcm_data, stderr = process.communicate()
+    if process.returncode != 0:
+        print(f"Error in converting MP3 to PCM: {stderr.decode()}")
+        return None
+
+    print("Successfully converted MP3 to raw PCM data.")
+    print(len(raw_pcm_data))
+    return raw_pcm_data
+
+def transmit_data_in_chunks(serial_port, data, chunk_size):
+    """
+    Transmits data over UART in chunks.
+    """
+    try:
+        total_chunks = (len(data) + chunk_size - 1) // chunk_size  # Calculate total number of chunks
+        for chunk_index in range(total_chunks):
+            start = chunk_index * chunk_size
+            end = min(start + chunk_size, len(data))
+            chunk = data[start:end]
+            
+            serial_port.write(chunk)  # Send the chunk
+            print(f"Sent chunk {chunk_index + 1}/{total_chunks}: {len(chunk)} bytes")
+            
+            time.sleep(0.01)  # Optional delay to ensure receiver can process the chunk
+    except Exception as e:
+        print(f"Error during transmission: {e}")
+
+if __name__ == "__main__":
+    mp3_file_path = r"namo_namo.mp3"  # Replace with your file path
+    
+    uart_port = 'COM15'  # Adjust this as per your system (e.g., COM1, COM2, etc.)
+    baudrate = 38400
+    chunk_size = 5500 # Define the size of each chunk
+
+    pcm_data_bytes = mp3_to_pcm_bytes(mp3_file_path)
+    if pcm_data_bytes is not None:
+        ser = serial.Serial(uart_port, baudrate=baudrate, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE)
+
+        # Transmit data in chunks
+        transmit_data_in_chunks(ser, pcm_data_bytes, chunk_size)
+
+        print("Transmission completed.")
+        ser.close()
